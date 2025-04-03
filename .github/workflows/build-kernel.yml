@@ -11,8 +11,6 @@ on:
         description: "Extra kernel config options (e.g. CONFIG_USB_VIDEO_CLASS=y)"
         required: false
         default: ""
-  schedule:
-    - cron: "0 0 * * 0" # Weekly builds
 
 env:
   ARTIFACT_NAME: wsl2-kernel
@@ -20,6 +18,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ARTIFACT_NAME: wsl2-kernel
+      KERNEL_DIR: linux-${{ github.event.inputs.kernel_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,19 +51,22 @@ jobs:
 
       - name: Build kernel
         run: |
-          cd $KERNEL_SRC
+          cd ${{ env.KERNEL_DIR }}
           make -j$(nproc)
+
+      - name: Verify bzImage exists
+        run: |
+          ls -lh ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage || echo "Error: bzImage not found!"
 
       - name: Package artifact
         run: |
-          mkdir -p $ARTIFACT_NAME
-          cp $KERNEL_SRC/arch/x86/boot/bzImage $ARTIFACT_NAME/bzImage
-          cp $KERNEL_SRC/.config $ARTIFACT_NAME/config
-          echo "Kernel version: ${{ github.event.inputs.kernel_version }}" > $ARTIFACT_NAME/version.txt
-          echo "Build date: $(date)" >> $ARTIFACT_NAME/version.txt
+          mkdir -p ${{ env.ARTIFACT_NAME }}
+          cp ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage ${{ env.ARTIFACT_NAME }}/
+          cp ${{ env.KERNEL_DIR }}/.config ${{ env.ARTIFACT_NAME }}/
+          echo "Version: ${{ github.event.inputs.kernel_version }}" > ${{ env.ARTIFACT_NAME }}/info.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}-${{ github.event.inputs.kernel_version }}
-          path: $ARTIFACT_NAME
+          path: ${{ env.ARTIFACT_NAME }}
