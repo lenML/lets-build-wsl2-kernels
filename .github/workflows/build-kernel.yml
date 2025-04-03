@@ -1,17 +1,21 @@
-name: Build WSL2 Kernel
+name: Build and Release WSL2 Kernel
 run-name: Build (${{ github.event.inputs.kernel_version }})
 
 on:
   workflow_dispatch:
     inputs:
       kernel_version:
-        description: "WSL2 kernel version (e.g. 5.15.90.4)"
+        description: "WSL2 kernel version (e.g. 5.15.57.1)"
         required: true
-        default: "5.15.90.4"
+        default: "5.15.57.1"
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      packages: write
     env:
       KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
       KERNEL_DIR: linux-${{ github.event.inputs.kernel_version }}
@@ -27,8 +31,7 @@ jobs:
           sudo apt-get install -y \
             build-essential flex bison dwarves \
             libssl-dev libelf-dev libncurses-dev \
-            bc rsync cpio python3 \
-            pahole
+            bc rsync cpio python3 pahole
 
       - name: Download Kernel Source
         run: |
@@ -43,33 +46,23 @@ jobs:
         run: |
           cd ${{ env.KERNEL_DIR }}
           cp Microsoft/config-wsl .config
-
           ./scripts/config --disable DEBUG_INFO_BTF
           ./scripts/config --enable LD_NO_EXEC_STACK
-          ./scripts/config --enable INIT_STACK_NONE
-
           make olddefconfig
 
       - name: Build Kernel
         run: |
           cd ${{ env.KERNEL_DIR }}
-          make -j$(nproc) \
-            LDFLAGS="-z noexecstack -z separate-code" \
-            LD=ld.bfd
+          make -j$(nproc) LDFLAGS="-z noexecstack -z separate-code" LD=ld.bfd
 
-          if [ ! -f arch/x86/boot/bzImage ]; then
-            echo "::error::Kernel build failed!"
-            exit 1
-          fi
-
-      - name: Verify Kernel Image
+      - name: Verify Build Artifacts
         run: |
-          file ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
           ls -lh ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
+          ls -lh ${{ env.KERNEL_DIR }}/.config
 
-      - name: Create Release
+      - name: Create GitHub Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: actions/create-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -79,11 +72,6 @@ jobs:
             ### Build Information
             - Version: ${{ env.KERNEL_VERSION }}
             - Build Date: $(date -u +'%Y-%m-%d %H:%M:%S')
-            - Build Flags: LDFLAGS="-z noexecstack -z separate-code"
-
-            ### Important Notes
-            This build DISABLED BTF to avoid linker errors.
-            Warnings about executable stack are suppressed but functionally safe.
 
             ### Installation
             1. Download `bzImage`
@@ -96,20 +84,20 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Kernel Image
-        uses: actions/upload-release-asset@v1
+      - name: Upload Release Assets
+        uses: alexellis/upload-assets@0.4.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
-          asset_name: bzImage-${{ env.KERNEL_VERSION }}
-          asset_content_type: application/octet-stream
-
-      - name: Upload Kernel Config
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.KERNEL_DIR }}/.config
-          asset_name: config-${{ env.KERNEL_VERSION }}.txt
-          asset_content_type: text/plain
+          asset_paths: |
+            [
+              "${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage",
+              "${{ env.KERNEL_DIR }}/.config",
+              "${{ env.KERNEL_DIR }}/build.log"
+            ]
+          asset_names: |
+            [
+              "bzImage-${{ env.KERNEL_VERSION }}",
+              "config-${{ env.KERNEL_VERSION }}.txt",
+              "build-log-${{ env.KERNEL_VERSION }}.txt"
+            ]
