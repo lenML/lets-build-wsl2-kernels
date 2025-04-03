@@ -1,5 +1,4 @@
 name: Build WSL2 Kernel
-
 run-name: Build (${{ github.event.inputs.kernel_version }})
 
 on:
@@ -28,7 +27,8 @@ jobs:
           sudo apt-get install -y \
             build-essential flex bison dwarves \
             libssl-dev libelf-dev libncurses-dev \
-            bc rsync cpio python3
+            bc rsync cpio python3 \
+            pahole
 
       - name: Download Kernel Source
         run: |
@@ -44,26 +44,28 @@ jobs:
           cd ${{ env.KERNEL_DIR }}
           cp Microsoft/config-wsl .config
 
+          ./scripts/config --disable DEBUG_INFO_BTF
           ./scripts/config --enable LD_NO_EXEC_STACK
           ./scripts/config --enable INIT_STACK_NONE
-          ./scripts/config --enable DEBUG_INFO_BTF
-          ./scripts/config --set-str DEBUG_INFO_BTF_MODULES ""
 
           make olddefconfig
-          make -j$(nproc) \
-              LDFLAGS="-z noexecstack -z separate-code" \
-              BTF_PAHOLE_FLAGS="--btf_gen_floats"
 
       - name: Build Kernel
         run: |
           cd ${{ env.KERNEL_DIR }}
-          make -j$(nproc) LDFLAGS="-z noexecstack -z separate-code" 2>&1 | tee build.log
+          make -j$(nproc) \
+            LDFLAGS="-z noexecstack -z separate-code" \
+            LD=ld.bfd
 
           if [ ! -f arch/x86/boot/bzImage ]; then
             echo "::error::Kernel build failed!"
-            cat build.log | grep -i error
             exit 1
           fi
+
+      - name: Verify Kernel Image
+        run: |
+          file ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
+          ls -lh ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
 
       - name: Create Release
         id: create_release
@@ -77,20 +79,24 @@ jobs:
             ### Build Information
             - Version: ${{ env.KERNEL_VERSION }}
             - Build Date: $(date -u +'%Y-%m-%d %H:%M:%S')
-            - Source: [Microsoft/WSL2-Linux-Kernel@${{ env.KERNEL_VERSION }}](https://github.com/microsoft/WSL2-Linux-Kernel/tree/linux-msft-wsl-${{ env.KERNEL_VERSION }})
+            - Build Flags: LDFLAGS="-z noexecstack -z separate-code"
 
-            ### Usage
+            ### Important Notes
+            This build DISABLED BTF to avoid linker errors.
+            Warnings about executable stack are suppressed but functionally safe.
+
+            ### Installation
             1. Download `bzImage`
             2. Place in `C:\Windows\System32\lxss\tools`
             3. Add to `.wslconfig`:
-            ```ini
-            [wsl2]
-            kernel=C:\\Windows\\System32\\lxss\\tools\\bzImage
-            ```
+               ```ini
+               [wsl2]
+               kernel=C:\\Windows\\System32\\lxss\\tools\\bzImage
+               ```
           draft: false
           prerelease: false
 
-      - name: Upload Kernel Assets
+      - name: Upload Kernel Image
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -100,9 +106,10 @@ jobs:
           asset_name: bzImage-${{ env.KERNEL_VERSION }}
           asset_content_type: application/octet-stream
 
-      - name: Upload Build Log
+      - name: Upload Kernel Config
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.KERNEL_DIR }}/build.log
-          asset_name: build-log-${{ env.KERNEL_VERSION }}.txt
+          asset_path: ${{ env.KERNEL_DIR }}/.config
+          asset_name: config-${{ env.KERNEL_VERSION }}.txt
+          asset_content_type: text/plain
