@@ -7,6 +7,10 @@ on:
         description: "WSL2 kernel version (e.g. 5.15.90.4)"
         required: true
         default: "5.15.90.4"
+      release_tag:
+        description: "GitHub Release tag (e.g. v5.15.90.4)"
+        required: true
+        default: "v5.15.90.4"
 
 jobs:
   build:
@@ -14,6 +18,7 @@ jobs:
     env:
       KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
       KERNEL_DIR: linux-${{ github.event.inputs.kernel_version }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
 
     steps:
       - uses: actions/checkout@v4
@@ -61,3 +66,34 @@ jobs:
         with:
           name: wsl2-kernel-${{ env.KERNEL_VERSION }}
           path: artifact
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          release_name: "WSL2 Kernel ${{ env.KERNEL_VERSION }}"
+          draft: false
+          prerelease: false
+
+      - name: Upload Kernel Image
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
+          asset_name: bzImage-${{ env.KERNEL_VERSION }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload Kernel Config
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.KERNEL_DIR }}/.config
+          asset_name: config-${{ env.KERNEL_VERSION }}.txt
+          asset_content_type: text/plain
