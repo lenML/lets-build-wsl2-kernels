@@ -1,0 +1,68 @@
+name: Build WSL2 Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: "WSL2 kernel version (e.g. 5.15.150.1)"
+        required: true
+        default: "5.15.150.1"
+      extra_config:
+        description: "Extra kernel config options (e.g. CONFIG_USB_VIDEO_CLASS=y)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 0 * * 0" # Weekly builds
+
+env:
+  ARTIFACT_NAME: wsl2-kernel
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential flex bison dwarves libssl-dev libelf-dev libncurses-dev
+
+      - name: Download kernel source
+        run: |
+          mkdir kernel
+          cd kernel
+          wget https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-${{ github.event.inputs.kernel_version }}.tar.gz
+          tar -xzf linux-msft-wsl-${{ github.event.inputs.kernel_version }}.tar.gz
+          mv WSL2-Linux-Kernel-linux-msft-wsl-${{ github.event.inputs.kernel_version}} linux-${{ github.event.inputs.kernel_version }}
+          echo "KERNEL_SRC=$(pwd)/linux-${{ github.event.inputs.kernel_version }}" >> $GITHUB_ENV
+
+      - name: Configure kernel
+        run: |
+          cd $KERNEL_SRC
+          cp Microsoft/config-wsl .config
+          # Apply extra config if provided
+          if [ -n "${{ github.event.inputs.extra_config }}" ]; then
+            echo "${{ github.event.inputs.extra_config }}" >> .config
+          fi
+          make olddefconfig
+
+      - name: Build kernel
+        run: |
+          cd $KERNEL_SRC
+          make -j$(nproc)
+
+      - name: Package artifact
+        run: |
+          mkdir -p $ARTIFACT_NAME
+          cp $KERNEL_SRC/arch/x86/boot/bzImage $ARTIFACT_NAME/bzImage
+          cp $KERNEL_SRC/.config $ARTIFACT_NAME/config
+          echo "Kernel version: ${{ github.event.inputs.kernel_version }}" > $ARTIFACT_NAME/version.txt
+          echo "Build date: $(date)" >> $ARTIFACT_NAME/version.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-${{ github.event.inputs.kernel_version }}
+          path: $ARTIFACT_NAME
