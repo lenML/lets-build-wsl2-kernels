@@ -1,5 +1,4 @@
 name: Build and Release WSL2 Kernel
-
 run-name: Build (${{ github.event.inputs.kernel_version }})
 
 on:
@@ -58,8 +57,6 @@ jobs:
       - name: Generate Release Notes
         run: |
           cat << EOF > release_notes.md
-          # WSL2 Kernel ${{ env.KERNEL_VERSION }}
-
           ### Build Information
           - Version: ${{ env.KERNEL_VERSION }}
           - Build Date: ${{ env.BUILD_DATE }}
