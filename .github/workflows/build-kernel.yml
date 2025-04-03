@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up build environment
         run: |
@@ -62,7 +62,7 @@ jobs:
           echo "Build date: $(date)" >> $ARTIFACT_NAME/version.txt
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}-${{ github.event.inputs.kernel_version }}
           path: $ARTIFACT_NAME
