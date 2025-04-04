@@ -1,6 +1,6 @@
 # Let's build wsl2 kernels 🛠️
 
-[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lenML/lets-build-wsl2-kernels/build.yml?style=flat-square)](https://github.com/lenML/lets-build-wsl2-kernels/actions)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lenML/lets-build-wsl2-kernels/build-kernel.yml?style=flat-square)](https://github.com/lenML/lets-build-wsl2-kernels/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 
 This repository provides automated builds of Microsoft's official WSL2 kernel sources, compiling and releasing only the bzImage kernel files.
