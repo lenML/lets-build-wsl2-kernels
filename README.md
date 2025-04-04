@@ -1,4 +1,4 @@
-# Let's build wsl2 kernels 🛠️
+# lets-build-wsl2-kernels 🛠️
 
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lenML/lets-build-wsl2-kernels/build-kernel.yml?style=flat-square)](https://github.com/lenML/lets-build-wsl2-kernels/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
@@ -25,6 +25,11 @@ This project:
 - Weekly automatic builds of latest stable version
 - Provides only the bzImage kernel file
 - Clean builds with no modifications
+
+## Download Pre-built Kernels
+
+Checkout releases:
+https://github.com/lenML/lets-build-wsl2-kernels/releases
 
 ## Usage 🚀
 
