@@ -1,0 +1,86 @@
+name: Build on ubuntu-20.04
+run-name: Build (${{ github.event.inputs.kernel_version }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: "WSL2 kernel version (e.g. 5.15.57.1)"
+        required: true
+        default: "5.15.57.1"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    env:
+      KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
+      KERNEL_DIR: linux-${{ github.event.inputs.kernel_version }}
+      RELEASE_TAG: v${{ github.event.inputs.kernel_version }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential flex bison dwarves \
+            libssl-dev libelf-dev libncurses-dev \
+            bc rsync cpio python3 pahole
+
+      - name: Download Kernel Source
+        run: |
+          mkdir -p kernel-build
+          cd kernel-build
+          wget https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-${{ env.KERNEL_VERSION }}.tar.gz
+          tar -xzf linux-msft-wsl-${{ env.KERNEL_VERSION }}.tar.gz
+          mv WSL2-Linux-Kernel-linux-msft-wsl-${{ env.KERNEL_VERSION }} linux-${{ env.KERNEL_VERSION }}
+          echo "KERNEL_DIR=$(pwd)/linux-${{ env.KERNEL_VERSION }}" >> $GITHUB_ENV
+
+      - name: Configure Kernel
+        run: |
+          cd ${{ env.KERNEL_DIR }}
+          cp Microsoft/config-wsl .config
+          ./scripts/config --disable DEBUG_INFO_BTF
+          ./scripts/config --enable LD_NO_EXEC_STACK
+          make olddefconfig
+
+      - name: Build Kernel
+        run: |
+          cd ${{ env.KERNEL_DIR }}
+          make -j$(nproc) LDFLAGS="-z noexecstack -z separate-code" LD=ld.bfd
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+
+      - name: Generate Release Notes
+        run: |
+          cat << EOF > release_notes.md
+          ### Build Information
+          - Version: ${{ env.KERNEL_VERSION }}
+          - Build Date: ${{ env.BUILD_DATE }}
+          - Source: [Microsoft/WSL2-Linux-Kernel@${{ env.KERNEL_VERSION }}](https://github.com/microsoft/WSL2-Linux-Kernel/tree/linux-msft-wsl-${{ env.KERNEL_VERSION }})
+
+          ### Installation
+          1. Download \`bzImage\`
+          2. Place in \`C:\Windows\System32\lxss\tools\`
+          3. Add to \`.wslconfig\`:
+          \`\`\`ini
+          [wsl2]
+          kernel=C:\\Windows\\System32\\lxss\\tools\\bzImage
+          \`\`\`
+          EOF
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "WSL2 Kernel ${{ env.KERNEL_VERSION }}"
+          body_path: release_notes.md
+          files: |
+            ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
+            ${{ env.KERNEL_DIR }}/.config
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
