@@ -1,3 +1,4 @@
+
 # lets-build-wsl2-kernels 🛠️
 
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/lenML/lets-build-wsl2-kernels/build-kernel.yml?style=flat-square)](https://github.com/lenML/lets-build-wsl2-kernels/actions)
@@ -21,8 +22,26 @@ Problems I discovered include:
   - Memory is requested but cannot be released, even when `pageReporting=true` is enabled.
   - `memlock` limits vary—some WSL instances have a higher or even unlimited locked memory cap, but typically the limit is around 2GB. In my tests, it sometimes allows only 2GB, which is entirely dependent on the WSL kernel.
     - `memlock` has a hard limit that seems unchangeable within WSL.
-    - `memlock` appears to overestimate current locked memory; repeated locking of the same memory can be counted multiple times.
+    - `memlock` appears to overestimate current locked memory; repeated locking of the same memory can be counted multiple times (as documented in [WSL's infiniband/user_verbs.rst](https://github.com/microsoft/WSL2-Linux-Kernel/blob/main/Documentation/infiniband/user_verbs.rst#memory-pinning)).
 - Some WSL kernels are incompatible with Docker Desktop.
+
+## Memory Management in WSL Kernels
+
+The WSL2 kernel has specific behaviors around memory allocation and locking:
+
+1. **Performance Monitoring Memory**: 
+   - The `perf_event_mlock_kb` setting governs memory available for performance monitoring
+   - This extends the `RLIMIT_MEMLOCK` limit but only for perf_event mmap buffers
+   - Processes with `CAP_IPC_LOCK` capability bypass these limits
+   - [See documentation](https://github.com/microsoft/WSL2-Linux-Kernel/blob/main/Documentation/admin-guide/perf-security.rst#memory-allocation)
+
+2. **Memory Pinning**:
+   - Direct I/O requires memory regions to stay at fixed physical addresses
+   - The kernel accounts pinned memory in `pinned_vm`
+   - Pages pinned multiple times are counted each time (may overestimate actual usage)
+   - [Documentation reference](https://github.com/microsoft/WSL2-Linux-Kernel/blob/main/Documentation/infiniband/user_verbs.rst#memory-pinning)
+
+These behaviors explain some of the memory management challenges encountered when running memory-intensive workloads in WSL2.
 
 ## Features ✨
 
