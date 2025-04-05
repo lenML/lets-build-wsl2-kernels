@@ -24,19 +24,12 @@ Problems I discovered include:
     - `memlock` appears to overestimate current locked memory; repeated locking of the same memory can be counted multiple times.
 - Some WSL kernels are incompatible with Docker Desktop.
 
-This project:
+## Features ✨
+
 - Automates building official Microsoft kernel sources exactly as released
 - Provides access to historical kernel versions
 - Only distributes the compiled bzImage (kernel binary)
 - Does NOT provide or modify any vhdx files
-
-## Features ✨
-
-- Builds any WSL2 kernel version from Microsoft's repository
-- Manual trigger with version selection
-- Weekly automatic builds of latest stable version
-- Provides only the bzImage kernel file
-- Clean builds with no modifications
 
 ## Download Pre-built Kernels
 
