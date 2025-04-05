@@ -12,6 +12,18 @@ Microsoft maintains the [WSL2-Linux-Kernel](https://github.com/microsoft/WSL2-Li
 - Only distributes kernels through Windows Update
 - Makes it difficult to test different kernel versions
 
+I encountered issues while fine-tuning models using **Unsloth**, and I suspect they are related to the WSL2 kernel. To experiment with different WSL kernels, I created this repository.
+
+The specific Unsloth issue can be found here: https://github.com/unslothai/unsloth/issues/1744  
+Problems I discovered include:
+
+- Some WSL kernel versions have serious memory management issues:
+  - Memory is requested but cannot be released, even when `pageReporting=true` is enabled.
+  - `memlock` limits vary—some WSL instances have a higher or even unlimited locked memory cap, but typically the limit is around 2GB. In my tests, it sometimes allows only 2GB, which is entirely dependent on the WSL kernel.
+    - `memlock` has a hard limit that seems unchangeable within WSL.
+    - `memlock` appears to overestimate current locked memory; repeated locking of the same memory can be counted multiple times.
+- Some WSL kernels are incompatible with Docker Desktop.
+
 This project:
 - Automates building official Microsoft kernel sources exactly as released
 - Provides access to historical kernel versions
@@ -28,7 +40,6 @@ This project:
 
 ## Download Pre-built Kernels
 
-Checkout releases:
 https://github.com/lenML/lets-build-wsl2-kernels/releases
 
 ## Usage 🚀
