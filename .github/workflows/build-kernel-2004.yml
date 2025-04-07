@@ -54,6 +54,12 @@ jobs:
           make -j$(nproc) LDFLAGS="-z noexecstack -z separate-code" LD=ld.bfd
           echo "BUILD_DATE=$(date -u +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
 
+      - name: Rename Output Files
+        run: |
+          cd ${{ env.KERNEL_DIR }}
+          mv arch/x86/boot/bzImage bzImage-${{ env.KERNEL_VERSION }}
+          mv .config config-${{ env.KERNEL_VERSION }}.txt
+
       - name: Generate Release Notes
         run: |
           cat << EOF > release_notes.md
@@ -63,12 +69,12 @@ jobs:
           - Source: [Microsoft/WSL2-Linux-Kernel@${{ env.KERNEL_VERSION }}](https://github.com/microsoft/WSL2-Linux-Kernel/tree/linux-msft-wsl-${{ env.KERNEL_VERSION }})
 
           ### Installation
-          1. Download \`bzImage\`
+          1. Download \`bzImage-${{ env.KERNEL_VERSION }}\`
           2. Place in \`C:\Windows\System32\lxss\tools\`
           3. Add to \`.wslconfig\`:
           \`\`\`ini
           [wsl2]
-          kernel=C:\\Windows\\System32\\lxss\\tools\\bzImage
+          kernel=C:\\Windows\\System32\\lxss\\tools\\bzImage-${{ env.KERNEL_VERSION }}
           \`\`\`
           EOF
 
@@ -79,8 +85,8 @@ jobs:
           name: "WSL2 Kernel ${{ env.KERNEL_VERSION }}"
           body_path: release_notes.md
           files: |
-            ${{ env.KERNEL_DIR }}/arch/x86/boot/bzImage
-            ${{ env.KERNEL_DIR }}/.config
+            ${{ env.KERNEL_DIR }}/bzImage-${{ env.KERNEL_VERSION }}
+            ${{ env.KERNEL_DIR }}/config-${{ env.KERNEL_VERSION }}.txt
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
